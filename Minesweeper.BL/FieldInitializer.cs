@@ -18,7 +18,7 @@
                 Cells = new Cell[VerticalCellsCount, HorizontalCellsCount]
             };
 
-            CreateCells();
+            CreateCells(_difficultyDefinition.MineCount);
             InitializeCells();
 
             return _field;
@@ -30,22 +30,28 @@
                    j >= 0 && j <= HorizontalCellsCount - 1;
         }
 
-        private void CreateCells()
+        private void CreateCells(int mineCount)
         {
-            var random = new Random();
-
+            var notMineCells = new List<(int i, int j)>();
+            mineCount++;
             for (var i = 0; i < VerticalCellsCount; i++)
             {
                 for (var j = 0; j < HorizontalCellsCount; j++)
                 {
-                    if (random.Next(1, 10) == 1)
-                    {
-                        _field[i, j] = new MineCell();
-                        continue;
-                    }
-
                     _field[i, j] = new Cell();
+                    notMineCells.Add((i, j));
                 }
+            }
+
+            var random = new Random();
+            while (mineCount != 0)
+            {
+                var next = random.Next(0, notMineCells.Count);
+                var tuple = notMineCells[next];
+                var randomCell = _field[tuple.i, tuple.j];
+                notMineCells.Remove(tuple);
+                randomCell.IsMine = true;
+                mineCount--;
             }
         }
 

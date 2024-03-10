@@ -2,30 +2,39 @@
 {
     public class Cell
     {
-        public IEnumerable<Cell> NeighborCells;
+        private IEnumerable<Cell> _neighborCells;
+
+        public bool CanRevealNeighbors
+        {
+            get
+            {
+                if (_neighborCells.Count(cell => !cell.IsRevealed) == 0)
+                    return false;
+                if (FlagsAroundCount == 0 && MinesAroundCount == 0)
+                    return false;
+                return MinesAroundCount - FlagsAroundCount == 0 && IsRevealed;
+            }
+        }
+
+        public int FlagsAroundCount => _neighborCells?.Count(cell => cell.IsFlagged) ?? -1;
         public bool IsFlagged { get; private set; }
+        public bool IsMine { get; internal set; }
         public bool IsRevealed { get; private set; }
-        public int MinesAroundCount => NeighborCells?.Count(cell => cell is MineCell) ?? -1;
+        public int MinesAroundCount => _neighborCells?.Count(cell => cell.IsMine) ?? -1;
 
         public void Initialize(IEnumerable<Cell> neighborCells)
         {
             var neighborCellsList = neighborCells.ToList();
-            ////TODO: вернуть
             if (neighborCellsList.Count() < 3 ||
                 neighborCellsList.Count() > 8)
                 throw new ArgumentException("Неверное количество соседствующих клеток.");
 
-            NeighborCells = neighborCellsList;
-            Revealed += OnRevealed;
+            _neighborCells = neighborCellsList;
         }
 
-        public virtual void Reveal()
+        public void Reveal()
         {
-            if (IsRevealed || IsFlagged)
-                return;
-
-            IsRevealed = true;
-            Revealed?.Invoke(this, EventArgs.Empty);
+            Reveal(true);
         }
 
         public event EventHandler Revealed;
@@ -35,18 +44,48 @@
             IsFlagged = !IsFlagged;
         }
 
-        private void OnRevealed(object? sender, EventArgs e)
+        private void Reveal(bool revealNeighbors)
         {
-            if (!(sender is Cell cell))
+            if (IsMine)
+                throw new GameOverException(MinesweeperGame.Instance.Score);
+
+            if (IsRevealed && revealNeighbors)
+            {
+                if (CanRevealNeighbors)
+                {
+                    RevealNeighbors();
+                    return;
+                }
+
+                return;
+            }
+            if (IsRevealed)
                 return;
 
-            if (cell.MinesAroundCount != 0)
+            if (IsFlagged)
                 return;
-            foreach (var neighborCell in cell.NeighborCells)
+
+            IsRevealed = true;
+            Revealed?.Invoke(this, EventArgs.Empty);
+
+            if (MinesAroundCount != 0)
+                return;
+
+            foreach (var neighborCell in _neighborCells)
             {
-                if (neighborCell is MineCell)
+                if (neighborCell.IsMine)
                     continue;
-                neighborCell.Reveal();
+
+                neighborCell.Reveal(false);
+            }
+        }
+
+
+        private void RevealNeighbors()
+        {
+            foreach (var neighborCell in _neighborCells.Where(cell => !cell.IsMine))
+            {
+                neighborCell.Reveal(false);
             }
         }
     }
